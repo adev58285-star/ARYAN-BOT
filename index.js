@@ -1,15 +1,9 @@
-/**
- * Knight Bot - A WhatsApp Bot
- * Copyright (c) 2024 Professor
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the MIT License.
- * 
- * Credits:
- * - Baileys Library by @adiwajshing
- * - Pair Code implementation inspired by TechGod143 & DGXEON
- */
-require('./settings')
+//JUNE//
+//Terrivez
+//supremeLord
+
+
+require('./setting/settings')
 const { Boom } = require('@hapi/boom')
 const fs = require('fs')
 const chalk = require('chalk')
@@ -20,10 +14,10 @@ const { handleMessages, handleGroupParticipantUpdate, handleStatus } = require('
 const PhoneNumber = require('awesome-phonenumber')
 const { imageToWebp, videoToWebp, writeExifImg, writeExifVid } = require('./lib/exif')
 const { smsg, isUrl, generateMessageTag, getBuffer, getSizeMedia, fetch, await, sleep, reSize } = require('./lib/myfunc')
-const {
+const { 
     default: makeWASocket,
-    useMultiFileAuthState,
-    DisconnectReason,
+    useMultiFileAuthState, 
+    DisconnectReason, 
     fetchLatestBaileysVersion,
     generateForwardMessageContent,
     prepareWAMessageMedia,
@@ -37,7 +31,6 @@ const {
     delay
 } = require("@whiskeysockets/baileys")
 const NodeCache = require("node-cache")
-// Using a lightweight persisted store instead of makeInMemoryStore (compat across versions)
 const pino = require("pino")
 const readline = require("readline")
 const { parsePhoneNumber } = require("libphonenumber-js")
@@ -45,123 +38,145 @@ const { PHONENUMBER_MCC } = require('@whiskeysockets/baileys/lib/Utils/generics'
 const { rmSync, existsSync } = require('fs')
 const { join } = require('path')
 
-// Import lightweight store
-const store = require('./lib/lightweight_store')
-
-// Initialize store
-store.readFromFile()
-const settings = require('./settings')
-setInterval(() => store.writeToFile(), settings.storeWriteInterval || 10000)
-
-// Memory optimization - Force garbage collection if available
-setInterval(() => {
-    if (global.gc) {
-        global.gc()
-        console.log('🧹 Garbage collection completed')
+// Create a store object with required methods
+const store = {
+    messages: {},
+    contacts: {},
+    chats: {},
+    groupMetadata: async (jid) => {
+        return {}
+    },
+    bind: function(ev) {
+        // Handle events
+        ev.on('messages.upsert', ({ messages }) => {
+            messages.forEach(msg => {
+                if (msg.key && msg.key.remoteJid) {
+                    this.messages[msg.key.remoteJid] = this.messages[msg.key.remoteJid] || {}
+                    this.messages[msg.key.remoteJid][msg.key.id] = msg
+                }
+            })
+        })
+        
+        ev.on('contacts.update', (contacts) => {
+            contacts.forEach(contact => {
+                if (contact.id) {
+                    this.contacts[contact.id] = contact
+                }
+            })
+        })
+        
+        ev.on('chats.set', (chats) => {
+            this.chats = chats
+        })
+    },
+    loadMessage: async (jid, id) => {
+        return this.messages[jid]?.[id] || null
     }
-}, 60_000) // every 1 minute
+}
 
-// Memory monitoring - Restart if RAM gets too high
-setInterval(() => {
-    const used = process.memoryUsage().rss / 1024 / 1024
-    if (used > 400) {
-        console.log('⚠️ RAM too high (>400MB), restarting bot...')
-        process.exit(1) // Panel will auto-restart
-    }
-}, 30_000) // check every 30 seconds
-
-let phoneNumber = "911234567890"
+let phoneNumber = "254792021944"
 let owner = JSON.parse(fs.readFileSync('./data/owner.json'))
 
-global.botname = "KNIGHT BOT"
+global.botname = "𝐉ᴜɴᴇ 𝐌ᴅ"
 global.themeemoji = "•"
+global.statusview = true
+
+const settings = require('./setting/settings')
 const pairingCode = !!phoneNumber || process.argv.includes("--pairing-code")
 const useMobile = process.argv.includes("--mobile")
 
-// Only create readline interface if we're in an interactive environment
 const rl = process.stdin.isTTY ? readline.createInterface({ input: process.stdin, output: process.stdout }) : null
 const question = (text) => {
     if (rl) {
         return new Promise((resolve) => rl.question(text, resolve))
     } else {
-        // In non-interactive environment, use ownerNumber from settings
+        
         return Promise.resolve(settings.ownerNumber || phoneNumber)
     }
 }
 
+const sessionDir = path.join(__dirname, 'session');
+const credsPath = path.join(sessionDir, 'creds.json');
 
-async function startXeonBotInc() {
-    try {
-        let { version, isLatest } = await fetchLatestBaileysVersion()
-        const { state, saveCreds } = await useMultiFileAuthState(`./session`)
-        const msgRetryCounterCache = new NodeCache()
+async function downloadSessionData() {
+  try {
 
-        const XeonBotInc = makeWASocket({
-            version,
-            logger: pino({ level: 'silent' }),
-            printQRInTerminal: !pairingCode,
-            browser: ["Ubuntu", "Chrome", "20.0.04"],
-            auth: {
-                creds: state.creds,
-                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" }).child({ level: "fatal" })),
-            },
-            markOnlineOnConnect: true,
-            generateHighQualityLinkPreview: true,
-            syncFullHistory: false,
-            getMessage: async (key) => {
-                let jid = jidNormalizedUser(key.remoteJid)
-                let msg = await store.loadMessage(jid, key.id)
-                return msg?.message || ""
-            },
-            msgRetryCounterCache,
-            defaultQueryTimeoutMs: 60000,
-            connectTimeoutMs: 60000,
-            keepAliveIntervalMs: 10000,
-        })
+    await fs.promises.mkdir(sessionDir, { recursive: true });
 
-        // Save credentials when they update
-        XeonBotInc.ev.on('creds.update', saveCreds)
+    if (!fs.existsSync(credsPath)) {
+      if (!global.SESSION_ID) {
+        return console.log(color(`Session id not found at SESSION_ID!\nCreds.json not found at session folder!\n\nWait to enter your number`, 'red'));
+      }
 
-    store.bind(XeonBotInc.ev)
+      const base64Data = global.SESSION_ID.split("trashcore~")[1];
+      
+      const sessionData = Buffer.from(base64Data, 'base64');
+      
+        await fs.promises.writeFile(credsPath, sessionData);
+      console.log(`Session successfully saved, please wait!!`);
+      await startconn();
+    }
+  } catch (error) {
+    console.error('Error downloading session data:', error);
+  }
+}
 
-    // Message handling
-    XeonBotInc.ev.on('messages.upsert', async chatUpdate => {
+async function startconn() {
+let { version, isLatest } = await fetchLatestBaileysVersion()
+const {  state, saveCreds } =await useMultiFileAuthState(`./session`)
+    const msgRetryCounterCache = new NodeCache() // for retry message, "waiting message"
+    const conn = makeWASocket({
+        version: [2, 3000, 1023223821],
+        logger: pino({ level: 'silent' }),
+        printQRInTerminal: !pairingCode, // popping up QR in terminal log
+      mobile: useMobile, // mobile api (prone to bans)
+      browser: [ "Ubuntu", "Chrome", "20.0.04" ], // for this issues https://github.com/WhiskeySockets/Baileys/issues/328
+     auth: {
+         creds: state.creds,
+         keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" }).child({ level: "fatal" })),
+      },
+      markOnlineOnConnect: true, // set false for offline
+      generateHighQualityLinkPreview: true, // make high preview link
+      getMessage: async (key) => {
+         let jid = jidNormalizedUser(key.remoteJid)
+         let msg = await store.loadMessage(jid, key.id)
+
+         return msg?.message || ""
+      },
+      msgRetryCounterCache, // Resolve waiting messages
+      defaultQueryTimeoutMs: undefined, // for this issues https://github.com/WhiskeySockets/Baileys/issues/276
+   })
+   
+   store.bind(conn.ev)
+ 
+        
+             
+
+    conn.ev.on('messages.upsert', async chatUpdate => {
         try {
             const mek = chatUpdate.messages[0]
             if (!mek.message) return
             mek.message = (Object.keys(mek.message)[0] === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
             if (mek.key && mek.key.remoteJid === 'status@broadcast') {
-                await handleStatus(XeonBotInc, chatUpdate);
+                await handleStatus(conn, chatUpdate);
                 return;
             }
-            // In private mode, only block non-group messages (allow groups for moderation)
-            // Note: XeonBotInc.public is not synced, so we check mode in main.js instead
-            // This check is kept for backward compatibility but mainly blocks DMs
-            if (!XeonBotInc.public && !mek.key.fromMe && chatUpdate.type === 'notify') {
-                const isGroup = mek.key?.remoteJid?.endsWith('@g.us')
-                if (!isGroup) return // Block DMs in private mode, but allow group messages
-            }
+            if (!conn.public && !mek.key.fromMe && chatUpdate.type === 'notify') return
             if (mek.key.id.startsWith('BAE5') && mek.key.id.length === 16) return
-
-            // Clear message retry cache to prevent memory bloat
-            if (XeonBotInc?.msgRetryCounterCache) {
-                XeonBotInc.msgRetryCounterCache.clear()
-            }
-
+            
             try {
-                await handleMessages(XeonBotInc, chatUpdate, true)
+                await handleMessages(conn, chatUpdate, true)
             } catch (err) {
                 console.error("Error in handleMessages:", err)
-                // Only try to send error message if we have a valid chatId
                 if (mek.key && mek.key.remoteJid) {
-                    await XeonBotInc.sendMessage(mek.key.remoteJid, {
+                    await conn.sendMessage(mek.key.remoteJid, { 
                         text: '❌ An error occurred while processing your message.',
                         contextInfo: {
                             forwardingScore: 1,
-                            isForwarded: true,
+                            isForwarded: false,
                             forwardedNewsletterMessageInfo: {
-                                newsletterJid: '120363161513685998@newsletter',
-                                newsletterName: 'KnightBot MD',
+                                newsletterJid: '@newsletter',
+                                newsletterName: '𝐉ᴜɴᴇ 𝐌ᴅ',
                                 serverMessageId: -1
                             }
                         }
@@ -173,8 +188,35 @@ async function startXeonBotInc() {
         }
     })
 
-    // Add these event handlers for better functionality
-    XeonBotInc.decodeJid = (jid) => {
+    conn.ev.on('messages.upsert', async chatUpdate => {
+        if (global.statusview){
+            try {
+                if (!chatUpdate.messages || chatUpdate.messages.length === 0) return;
+                const mek = chatUpdate.messages[0];
+
+                if (!mek.message) return;
+                mek.message =
+                    Object.keys(mek.message)[0] === 'ephemeralMessage'
+                        ? mek.message.ephemeralMessage.message
+                        : mek.message;
+
+                if (mek.key && mek.key.remoteJid === 'status@broadcast') {
+                    let emoji = [ "💙","❤️","💓","⭐","👍","😘","🤍","🖤" ];
+                    let sigma = emoji[Math.floor(Math.random() * emoji.length)];
+                    await conn.readMessages([mek.key]);
+                    conn.sendMessage(
+                        'status@broadcast',
+                        { react: { text: sigma, key: mek.key } },
+                        { statusJidList: [mek.key.participant] },
+                    );
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+    });
+
+    conn.decodeJid = (jid) => {
         if (!jid) return jid
         if (/:\d+@/gi.test(jid)) {
             let decode = jidDecode(jid) || {}
@@ -182,59 +224,56 @@ async function startXeonBotInc() {
         } else return jid
     }
 
-    XeonBotInc.ev.on('contacts.update', update => {
+    conn.ev.on('contacts.update', update => {
         for (let contact of update) {
-            let id = XeonBotInc.decodeJid(contact.id)
+            let id = conn.decodeJid(contact.id)
             if (store && store.contacts) store.contacts[id] = { id, name: contact.notify }
         }
     })
 
-    XeonBotInc.getName = (jid, withoutContact = false) => {
-        id = XeonBotInc.decodeJid(jid)
-        withoutContact = XeonBotInc.withoutContact || withoutContact
+    conn.getName = (jid, withoutContact = false) => {
+        id = conn.decodeJid(jid)
+        withoutContact = conn.withoutContact || withoutContact 
         let v
         if (id.endsWith("@g.us")) return new Promise(async (resolve) => {
             v = store.contacts[id] || {}
-            if (!(v.name || v.subject)) v = XeonBotInc.groupMetadata(id) || {}
+            if (!(v.name || v.subject)) v = conn.groupMetadata(id) || {}
             resolve(v.name || v.subject || PhoneNumber('+' + id.replace('@s.whatsapp.net', '')).getNumber('international'))
         })
         else v = id === '0@s.whatsapp.net' ? {
             id,
             name: 'WhatsApp'
-        } : id === XeonBotInc.decodeJid(XeonBotInc.user.id) ?
-            XeonBotInc.user :
+        } : id === conn.decodeJid(conn.user.id) ?
+            conn.user :
             (store.contacts[id] || {})
         return (withoutContact ? '' : v.name) || v.subject || v.verifiedName || PhoneNumber('+' + jid.replace('@s.whatsapp.net', '')).getNumber('international')
     }
 
-    XeonBotInc.public = true
+    conn.public = true
 
-    XeonBotInc.serializeM = (m) => smsg(XeonBotInc, m, store)
+    conn.serializeM = (m) => smsg(conn, m, store)
 
-    // Handle pairing code
-    if (pairingCode && !XeonBotInc.authState.creds.registered) {
+    if (pairingCode && !conn.authState.creds.registered) {
         if (useMobile) throw new Error('Cannot use pairing code with mobile api')
 
         let phoneNumber
         if (!!global.phoneNumber) {
             phoneNumber = global.phoneNumber
         } else {
-            phoneNumber = await question(chalk.bgBlack(chalk.greenBright(`Please type your WhatsApp number 😍\nFormat: 6281376552730 (without + or spaces) : `)))
+            phoneNumber = await question(chalk.bgBlack(chalk.greenBright(`Please type your WhatsApp number 😍\nFormat: 2547XXXXX (without + or spaces) : `)))
         }
 
-        // Clean the phone number - remove any non-digit characters
         phoneNumber = phoneNumber.replace(/[^0-9]/g, '')
 
-        // Validate the phone number using awesome-phonenumber
         const pn = require('awesome-phonenumber');
         if (!pn('+' + phoneNumber).isValid()) {
-            console.log(chalk.red('Invalid phone number. Please enter your full international number (e.g., 15551234567 for US, 447911123456 for UK, etc.) without + or spaces.'));
+            console.log(chalk.red('Invalid phone number. Please enter your full international number (e.g., 255792021944 for Tanzania, 254798570132 for Kenya, etc.) without + or spaces.'));
             process.exit(1);
         }
 
         setTimeout(async () => {
             try {
-                let code = await XeonBotInc.requestPairingCode(phoneNumber)
+                let code = await conn.requestPairingCode(phoneNumber)
                 code = code?.match(/.{1,4}/g)?.join("-") || code
                 console.log(chalk.black(chalk.bgGreen(`Your Pairing Code : `)), chalk.black(chalk.white(code)))
                 console.log(chalk.yellow(`\nPlease enter this code in your WhatsApp app:\n1. Open WhatsApp\n2. Go to Settings > Linked Devices\n3. Tap "Link a Device"\n4. Enter the code shown above`))
@@ -245,146 +284,108 @@ async function startXeonBotInc() {
         }, 3000)
     }
 
-    // Connection handling
-    XeonBotInc.ev.on('connection.update', async (s) => {
-        const { connection, lastDisconnect, qr } = s
-        
-        if (qr) {
-            console.log(chalk.yellow('📱 QR Code generated. Please scan with WhatsApp.'))
-        }
-        
-        if (connection === 'connecting') {
-            console.log(chalk.yellow('🔄 Connecting to WhatsApp...'))
-        }
-        
+    
+    conn.ev.on('connection.update', async (s) => {        
+        const { connection, lastDisconnect } = s
         if (connection == "open") {
+            await conn.groupAcceptInvite('HsPNX1fC2UY5mGSIyGr8m6');
             console.log(chalk.magenta(` `))
-            console.log(chalk.yellow(`🌿Connected to => ` + JSON.stringify(XeonBotInc.user, null, 2)))
-
-            try {
-                const botNumber = XeonBotInc.user.id.split(':')[0] + '@s.whatsapp.net';
-                await XeonBotInc.sendMessage(botNumber, {
-                    text: `🤖 Bot Connected Successfully!\n\n⏰ Time: ${new Date().toLocaleString()}\n✅ Status: Online and Ready!\n\n✅Make sure to join below channel`,
-                    contextInfo: {
-                        forwardingScore: 1,
-                        isForwarded: true,
-                        forwardedNewsletterMessageInfo: {
-                            newsletterJid: '120363161513685998@newsletter',
-                            newsletterName: 'KnightBot MD',
-                            serverMessageId: -1
-                        }
+            console.log(chalk.yellow(`♻️Connected to => ` + JSON.stringify(conn.user, null, 2)))
+            
+            const botNumber = conn.user.id.split(':')[0] + '@s.whatsapp.net';
+            await conn.sendMessage(botNumber, { 
+                text: 
+                `
+┏❐═⭔ *CONNECTED* ⭔═❐
+┃⭔ *Bot:* JUNE MD
+┃⭔ *Time:* ${new Date().toLocaleString()}
+┃⭔ *Status:* Online
+┃⭔ *User:* ${botNumber}
+┗❐═⭔════════⭔═❐`,
+                contextInfo: {
+                    forwardingScore: 1,
+                    isForwarded: false,
+                    forwardedNewsletterMessageInfo: {
+                        newsletterJid: '@newsletter',
+                        newsletterName: '𝐉ᴜɴᴇ 𝐌ᴅ',
+                        serverMessageId: -1
                     }
-                });
-            } catch (error) {
-                console.error('Error sending connection message:', error.message)
-            }
+                }
+            });
 
             await delay(1999)
-            console.log(chalk.yellow(`\n\n                  ${chalk.bold.blue(`[ ${global.botname || 'KNIGHT BOT'} ]`)}\n\n`))
+            console.log(chalk.yellow(`\n\n    ${chalk.bold.blue(`[ ${global.botname || 'KNIGHT BOT'} ]`)}\n\n`))
             console.log(chalk.cyan(`< ================================================== >`))
-            console.log(chalk.magenta(`\n${global.themeemoji || '•'} YT CHANNEL: MR UNIQUE HACKER`))
+            console.log(chalk.magenta(`\n${global.themeemoji || '•'} YT CHANNEL: SUPRMELORD`))
             console.log(chalk.magenta(`${global.themeemoji || '•'} GITHUB: mrunqiuehacker`))
             console.log(chalk.magenta(`${global.themeemoji || '•'} WA NUMBER: ${owner}`))
-            console.log(chalk.magenta(`${global.themeemoji || '•'} CREDIT: MR UNIQUE HACKER`))
+            console.log(chalk.magenta(`${global.themeemoji || '•'} CREDIT: SUPREMELORD`))
             console.log(chalk.green(`${global.themeemoji || '•'} 🤖 Bot Connected Successfully! ✅`))
-            console.log(chalk.blue(`Bot Version: ${settings.version}`))
+            console.log(chalk.cyan(`< ================================================== >`))
         }
-        
-        if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut
-            const statusCode = lastDisconnect?.error?.output?.statusCode
-            
-            console.log(chalk.red(`Connection closed due to ${lastDisconnect?.error}, reconnecting ${shouldReconnect}`))
-            
-            if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-                try {
-                    rmSync('./session', { recursive: true, force: true })
-                    console.log(chalk.yellow('Session folder deleted. Please re-authenticate.'))
-                } catch (error) {
-                    console.error('Error deleting session:', error)
-                }
-                console.log(chalk.red('Session logged out. Please re-authenticate.'))
-            }
-            
-            if (shouldReconnect) {
-                console.log(chalk.yellow('Reconnecting...'))
-                await delay(5000)
-                startXeonBotInc()
-            }
+        if (
+            connection === "close" &&
+            lastDisconnect &&
+            lastDisconnect.error &&
+            lastDisconnect.error.output.statusCode != 401
+        ) {
+            startconn()
         }
     })
 
-    // Track recently-notified callers to avoid spamming messages
-    const antiCallNotified = new Set();
+    conn.ev.on('creds.update', saveCreds)
 
-    // Anticall handler: block callers when enabled
-    XeonBotInc.ev.on('call', async (calls) => {
-        try {
-            const { readState: readAnticallState } = require('./commands/anticall');
-            const state = readAnticallState();
-            if (!state.enabled) return;
-            for (const call of calls) {
-                const callerJid = call.from || call.peerJid || call.chatId;
-                if (!callerJid) continue;
-                try {
-                    // First: attempt to reject the call if supported
-                    try {
-                        if (typeof XeonBotInc.rejectCall === 'function' && call.id) {
-                            await XeonBotInc.rejectCall(call.id, callerJid);
-                        } else if (typeof XeonBotInc.sendCallOfferAck === 'function' && call.id) {
-                            await XeonBotInc.sendCallOfferAck(call.id, callerJid, 'reject');
-                        }
-                    } catch {}
-
-                    // Notify the caller only once within a short window
-                    if (!antiCallNotified.has(callerJid)) {
-                        antiCallNotified.add(callerJid);
-                        setTimeout(() => antiCallNotified.delete(callerJid), 60000);
-                        await XeonBotInc.sendMessage(callerJid, { text: '📵 Anticall is enabled. Your call was rejected and you will be blocked.' });
-                    }
-                } catch {}
-                // Then: block after a short delay to ensure rejection and message are processed
-                setTimeout(async () => {
-                    try { await XeonBotInc.updateBlockStatus(callerJid, 'block'); } catch {}
-                }, 800);
-            }
-        } catch (e) {
-            // ignore
-        }
+    conn.ev.on('group-participants.update', async (update) => {
+        await handleGroupParticipantUpdate(conn, update);
     });
 
-    XeonBotInc.ev.on('group-participants.update', async (update) => {
-        await handleGroupParticipantUpdate(XeonBotInc, update);
-    });
-
-    XeonBotInc.ev.on('messages.upsert', async (m) => {
+    conn.ev.on('messages.upsert', async (m) => {
         if (m.messages[0].key && m.messages[0].key.remoteJid === 'status@broadcast') {
-            await handleStatus(XeonBotInc, m);
+            await handleStatus(conn, m);
         }
     });
 
-    XeonBotInc.ev.on('status.update', async (status) => {
-        await handleStatus(XeonBotInc, status);
+    conn.ev.on('status.update', async (status) => {
+        await handleStatus(conn, status);
     });
 
-    XeonBotInc.ev.on('messages.reaction', async (status) => {
-        await handleStatus(XeonBotInc, status);
+    conn.ev.on('messages.reaction', async (status) => {
+        await handleStatus(conn, status);
     });
-
-    return XeonBotInc
-    } catch (error) {
-        console.error('Error in startXeonBotInc:', error)
-        await delay(5000)
-        startXeonBotInc()
-    }
+    
+    conn.sendText = (jid, text, quoted = '', options) => conn.sendMessage(jid, {
+        text: text,
+        ...options
+    }, {
+        quoted,
+        ...options
+    });
+      
+    return conn;
 }
 
+async function supreme() {
+    if (fs.existsSync(credsPath)) {
+        console.log("Session file found, starting bot...");
+await startconn();
+} else {
+         const sessionDownloaded = await downloadSessionData();
+        if (sessionDownloaded) {
+            console.log("Session downloaded, starting bot.");
+await startconn();
+    } else {
+     if (!fs.existsSync(credsPath)) {
+    if(!global.SESSION_ID) {
+            console.log("Please wait for a few seconds to enter your number!", 'red');
+await startconn();
+        }
+    }
+  }
+ }
+}
 
-// Start the bot with error handling
-startXeonBotInc().catch(error => {
-    console.error('Fatal error:', error)
-    process.exit(1)
-})
+supreme()
+
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err)
 })
