@@ -4,17 +4,13 @@ const path = require('path');
 
 async function helpCommand(sock, chatId, message) {
     const helpMessage = `
-╔═══════════════════╗
-   *🤖 ${settings.botName || 'KnightBot-MD'}*  
-   Version: *${settings.version || '3.0.0'}*
-   by ${settings.botOwner || 'Mr Unique Hacker'}
-   YT : ${global.ytch}
-╚═══════════════════╝
+╔═════  *${settings.botName || 'ARYAN-BOT'}*  ╗
+║   Version: *${settings.version || '1.0.0'}*
+║   Owner: ${settings.botOwner || ''} 
+║   YT : ${global.ytch}
 
-*Available Commands:*
-
-╔═══════════════════╗
-🌐 *General Commands*:
+╔═══════════════════
+ *General Commands*:
 ║ ➤ .help or .menu
 ║ ➤ .ping
 ║ ➤ .alive
@@ -35,10 +31,10 @@ async function helpCommand(sock, chatId, message) {
 ║ ➤ .ss <link>
 ║ ➤ .jid
 ║ ➤ .url
-╚═══════════════════╝ 
+╚═══════════════════
 
-╔═══════════════════╗
-👮‍♂️ *Admin Commands*:
+╔═══════════════════
+ *Admin Commands*:
 ║ ➤ .ban @user
 ║ ➤ .promote @user
 ║ ➤ .demote @user
@@ -63,10 +59,10 @@ async function helpCommand(sock, chatId, message) {
 ║ ➤ .setgdesc <description>
 ║ ➤ .setgname <new name>
 ║ ➤ .setgpp (reply to image)
-╚═══════════════════╝
+╚═══════════════════
 
-╔═══════════════════╗
-🔒 *Owner Commands*:
+╔═══════════════════
+*Owner Commands*:
 ║ ➤ .mode <public/private>
 ║ ➤ .clearsession
 ║ ➤ .antidelete
@@ -84,9 +80,9 @@ async function helpCommand(sock, chatId, message) {
 ║ ➤ .pmblocker setmsg <text>
 ║ ➤ .setmention <reply to msg>
 ║ ➤ .mention <on/off>
-╚═══════════════════╝
+╚═══════════════════
 
-╔═══════════════════╗
+╔═══════════════════
 🎨 *Image/Sticker Commands*:
 ║ ➤ .blur <image>
 ║ ➤ .simage <reply to sticker>
@@ -100,20 +96,20 @@ async function helpCommand(sock, chatId, message) {
 ║ ➤ .emojimix <emj1>+<emj2>
 ║ ➤ .igs <insta link>
 ║ ➤ .igsc <insta link>
-╚═══════════════════╝  
+╚═══════════════════ 
 
-╔═══════════════════╗
-🖼️ *Pies Commands*:
+╔═══════════════════
+ *Pies Commands*:
 ║ ➤ .pies <country>
 ║ ➤ .china 
 ║ ➤ .indonesia 
 ║ ➤ .japan 
 ║ ➤ .korea 
 ║ ➤ .hijab
-╚═══════════════════╝
+╚═══════════════════
 
-╔═══════════════════╗
-🎮 *Game Commands*:
+╔═══════════════════
+ *Game Commands*:
 ║ ➤ .tictactoe @user
 ║ ➤ .hangman
 ║ ➤ .guess <letter>
@@ -121,19 +117,19 @@ async function helpCommand(sock, chatId, message) {
 ║ ➤ .answer <answer>
 ║ ➤ .truth
 ║ ➤ .dare
-╚═══════════════════╝
+╚═══════════════════
 
-╔═══════════════════╗
-🤖 *AI Commands*:
+╔═══════════════════
+ *AI Commands*:
 ║ ➤ .gpt <question>
 ║ ➤ .gemini <question>
 ║ ➤ .imagine <prompt>
 ║ ➤ .flux <prompt>
 ║ ➤ .sora <prompt>
-╚═══════════════════╝
+╚═══════════════════
 
-╔═══════════════════╗
-🎯 *Fun Commands*:
+╔═══════════════════
+ *Fun Commands*:
 ║ ➤ .compliment @user
 ║ ➤ .insult @user
 ║ ➤ .flirt 
@@ -145,9 +141,9 @@ async function helpCommand(sock, chatId, message) {
 ║ ➤ .ship @user
 ║ ➤ .simp @user
 ║ ➤ .stupid @user [text]
-╚═══════════════════╝
+╚═══════════════════
 
-╔═══════════════════╗
+╔═══════════════════
 🔤 *Textmaker*:
 ║ ➤ .metallic <text>
 ║ ➤ .ice <text>
@@ -167,10 +163,10 @@ async function helpCommand(sock, chatId, message) {
 ║ ➤ .blackpink <text>
 ║ ➤ .glitch <text>
 ║ ➤ .fire <text>
-╚═══════════════════╝
+╚═══════════════════
 
-╔═══════════════════╗
-📥 *Downloader*:
+╔═══════════════════
+ *Downloader*:
 ║ ➤ .play <song_name>
 ║ ➤ .song <song_name>
 ║ ➤ .spotify <query>
@@ -179,10 +175,10 @@ async function helpCommand(sock, chatId, message) {
 ║ ➤ .tiktok <link>
 ║ ➤ .video <song name>
 ║ ➤ .ytmp4 <Link>
-╚═══════════════════╝
+╚═══════════════════
 
-╔═══════════════════╗
-🧩 *MISC*:
+╔═══════════════════
+ *MISC*:
 ║ ➤ .heart
 ║ ➤ .horny
 ║ ➤ .circle
@@ -199,10 +195,10 @@ async function helpCommand(sock, chatId, message) {
 ║ ➤ .jail 
 ║ ➤ .passed 
 ║ ➤ .triggered
-╚═══════════════════╝
+╚═══════════════════
 
-╔═══════════════════╗
-🖼️ *ANIME*:
+╔═══════════════════
+ *ANIME*:
 ║ ➤ .nom 
 ║ ➤ .poke 
 ║ ➤ .cry 
@@ -211,16 +207,16 @@ async function helpCommand(sock, chatId, message) {
 ║ ➤ .hug 
 ║ ➤ .wink 
 ║ ➤ .facepalm 
-╚═══════════════════╝
+╚═══════════════════
 
-╔═══════════════════╗
-💻 *Github Commands:*
+╔═══════════════════
+ *Github Commands:*
 ║ ➤ .git
 ║ ➤ .github
 ║ ➤ .sc
 ║ ➤ .script
 ║ ➤ .repo
-╚═══════════════════╝
+╚═══════════════════
 
 Join our channel for updates:`;
 
@@ -237,8 +233,8 @@ Join our channel for updates:`;
                     forwardingScore: 1,
                     isForwarded: true,
                     forwardedNewsletterMessageInfo: {
-                        newsletterJid: '120363161513685998@newsletter',
-                        newsletterName: 'KnightBot MD',
+                        newsletterJid: '@newsletter',
+                        newsletterName: ' MD',
                         serverMessageId: -1
                     }
                 }
@@ -251,8 +247,8 @@ Join our channel for updates:`;
                     forwardingScore: 1,
                     isForwarded: true,
                     forwardedNewsletterMessageInfo: {
-                        newsletterJid: '120363161513685998@newsletter',
-                        newsletterName: 'KnightBot MD by Mr Unique Hacker',
+                        newsletterJid: '@newsletter',
+                        newsletterName: '',
                         serverMessageId: -1
                     } 
                 }
