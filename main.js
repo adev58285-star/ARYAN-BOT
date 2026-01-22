@@ -335,7 +335,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
             isBotAdmin = adminStatus.isBotAdmin;
 
             if (!isBotAdmin) {
-                await sock.sendMessage(chatId, { text: 'Please make the bot an admin to use admin commands.', ...channelInfo }, { quoted: message });
+                await sock.sendMessage(chatId, { text: 'Please make the bot an admin to use admin commands.', ... }, { quoted: message });
                 return;
             }
 
@@ -459,7 +459,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
                     data = JSON.parse(fs.readFileSync('./data/messageCount.json'));
                 } catch (error) {
                     console.error('Error reading access mode:', error);
-                    await sock.sendMessage(chatId, { text: 'Failed to read bot mode status', ...channelInfo });
+                    await sock.sendMessage(chatId, { text: 'Failed to read bot mode status', ... });
                     return;
                 }
 
@@ -469,7 +469,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
                     const currentMode = data.isPublic ? 'public' : 'private';
                     await sock.sendMessage(chatId, {
                         text: `Current bot mode: *${currentMode}*\n\nUsage: .mode public/private\n\nExample:\n.mode public - Allow everyone to use bot\n.mode private - Restrict to owner only`,
-                        ...channelInfo
+                        ...
                     }, { quoted: message });
                     return;
                 }
@@ -477,7 +477,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
                 if (action !== 'public' && action !== 'private') {
                     await sock.sendMessage(chatId, {
                         text: 'Usage: .mode public/private\n\nExample:\n.mode public - Allow everyone to use bot\n.mode private - Restrict to owner only',
-                        ...channelInfo
+                        ...
                     }, { quoted: message });
                     return;
                 }
@@ -489,10 +489,10 @@ async function handleMessages(sock, messageUpdate, printLog) {
                     // Save updated data
                     fs.writeFileSync('./data/messageCount.json', JSON.stringify(data, null, 2));
 
-                    await sock.sendMessage(chatId, { text: `Bot is now in *${action}* mode`, ...channelInfo });
+                    await sock.sendMessage(chatId, { text: `Bot is now in *${action}* mode`, ... });
                 } catch (error) {
                     console.error('Error updating access mode:', error);
-                    await sock.sendMessage(chatId, { text: 'Failed to update bot access mode', ...channelInfo });
+                    await sock.sendMessage(chatId, { text: 'Failed to update bot access mode', ... });
                 }
                 break;
             case userMessage.startsWith('.anticall'):
