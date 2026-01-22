@@ -223,7 +223,7 @@ async function startXeonBotInc() {
         version,
         logger: pino({ level: 'silent' }),
         printQRInTerminal: false,
-        browser: ["ARYAN-BOT", "Chrome", "20.0.04"],
+        browser: ["Ubuntu", "Chrome", "20.0.04"],
         auth: {
             creds: state.creds,
             keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" })),
