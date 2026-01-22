@@ -1,148 +1,419 @@
-// index.js
-require('dotenv').config()
-const chalk = require('chalk')
-const fs = require('fs')
-const path = require('path')
-const readline = require('readline')
-const NodeCache = require('node-cache')
-const pino = require('pino')
-const { rmSync } = require('fs')
-const { delay, fetchLatestBaileysVersion, makeCacheableSignalKeyStore, DisconnectReason } = require('@whiskeysockets/baileys')
+const fs = require('fs');
+const chalk = require('chalk');
+const path = require('path');
+const { 
+    default: makeWASocket, 
+    useMultiFileAuthState, 
+    DisconnectReason, 
+    fetchLatestBaileysVersion, 
+    jidNormalizedUser, 
+    makeCacheableSignalKeyStore, 
+    delay 
+} = require("@whiskeysockets/baileys");
+const NodeCache = require("node-cache");
+const pino = require("pino");
+const readline = require("readline");
+const { rmSync } = require('fs');
+require('dotenv').config();
 
-const store = require('./lib/lightweight_store')
-const { handleMessages, handleGroupParticipantUpdate, handleStatus } = require('./main')
-const { smsg } = require('./lib/myfunc')
+// --- Global Setup ---
+global.isBotConnected = false;
+global.errorRetryCount = 0;
+global.messageBackup = {};
+global.botname = "ARYAN-BOT";
+global.themeemoji = "•";
 
-// --- Global Config ---
-const BOT_NAME = "KNIGHT BOT"
-const THEME_EMOJI = "•"
-const SESSION_PATH = path.join(__dirname, "session")
+// --- Paths ---
+const sessionDir = path.join(__dirname, 'session');
+const credsPath = path.join(sessionDir, 'creds.json');
+const loginFile = path.join(__dirname, 'login.json');
+const MESSAGE_STORE_FILE = path.join(__dirname, 'message_backup.json');
+const SESSION_ERROR_FILE = path.join(__dirname, 'sessionErrorCount.json');
 
-// --- Store Init ---
-store.readFromFile()
-setInterval(() => store.writeToFile(), 10_000)
-
-// --- Memory & RAM Monitoring ---
-setInterval(() => global.gc && global.gc(), 60_000)
-setInterval(() => {
-    const used = process.memoryUsage().rss / 1024 / 1024
-    if (used > 400) {
-        console.log('⚠️ RAM too high (>400MB), restarting...')
-        process.exit(1)
-    }
-}, 30_000)
-
-// --- CLI Helpers ---
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-const ask = (q) => new Promise(res => rl.question(chalk.cyan(q), ans => res(ans.trim())))
-
-// --- Login Options ---
-async function chooseLogin() {
-    console.clear()
-    console.log(chalk.yellow('╔══════════════════════════════╗'))
-    console.log(chalk.yellow('║     KNIGHT BOT LOGIN         ║'))
-    console.log(chalk.yellow('╚══════════════════════════════╝'))
-    console.log(chalk.cyan('1. Phone Number\n2. Session ID\n3. Existing Session'))
-
-    const choice = await ask('Enter choice (1/2/3): ')
-    if (choice === '1') return loginPhone()
-    if (choice === '2') return loginSessionId()
-    if (choice === '3') return { method: 'existing', path: SESSION_PATH }
-    console.log(chalk.red('Invalid choice.'))
-    return chooseLogin()
+// --- Logging ---
+function log(message, color = 'white', isError = false) {
+    const prefix = chalk.cyan.bold('[ ARYAN-BOT ]');
+    const logFunc = isError ? console.error : console.log;
+    logFunc(`${prefix} ${chalk[color](message)}`);
 }
 
-async function loginPhone() {
-    let phone = await ask('Enter phone number (with country code): ')
-    phone = phone.replace(/\D/g, '')
-    if (!phone.startsWith('91') && phone.length === 10) phone = '91' + phone
-    const usePairing = (await ask('Use pairing code? (y/N): ')).toLowerCase() === 'y'
-    return { method: 'phone', phoneNumber: phone, pairingCode: usePairing }
-}
-
-async function loginSessionId() {
-    let id = await ask('Paste Session ID: ')
-    if (!id.startsWith('ARYAN:~')) id = `ARYAN:~${id}`
-    return { method: 'sessionId', sessionId: id }
-}
-
-// --- Auth Loader ---
-async function getAuthState(login) {
-    const { useMultiFileAuthState } = require('@whiskeysockets/baileys')
-    if (!fs.existsSync(SESSION_PATH)) fs.mkdirSync(SESSION_PATH, { recursive: true })
-
-    if (login.method === 'sessionId') {
-        fs.writeFileSync(path.join(SESSION_PATH, "creds.json"), JSON.stringify({ sessionId: login.sessionId }, null, 2))
-    }
-    return useMultiFileAuthState(login.path || SESSION_PATH)
-}
-
-// --- Bot Startup ---
-async function startBot() {
+// --- File Management ---
+function loadStoredMessages() {
     try {
-        const login = await chooseLogin()
-        const { version } = await fetchLatestBaileysVersion()
-        const { state, saveCreds } = await getAuthState(login)
-        const msgCache = new NodeCache()
+        if (fs.existsSync(MESSAGE_STORE_FILE)) {
+            return JSON.parse(fs.readFileSync(MESSAGE_STORE_FILE, 'utf-8'));
+        }
+    } catch (error) { log(`Error loading message store: ${error.message}`, 'red', true); }
+    return {};
+}
 
-        const { default: makeWASocket } = require('@whiskeysockets/baileys')
-        const sock = makeWASocket({
-            version,
-            logger: pino({ level: 'silent' }),
-            printQRInTerminal: login.method === 'phone' && !login.pairingCode,
-            browser: ["Ubuntu", "Chrome", "20.0.04"],
-            auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" })) },
-            msgRetryCounterCache: msgCache,
-        })
+function saveStoredMessages(data) {
+    try {
+        fs.writeFileSync(MESSAGE_STORE_FILE, JSON.stringify(data, null, 2));
+    } catch (error) { log(`Error saving message store: ${error.message}`, 'red', true); }
+}
 
-        sock.ev.on('creds.update', saveCreds)
-        store.bind(sock.ev)
+function loadErrorCount() {
+    try {
+        if (fs.existsSync(SESSION_ERROR_FILE)) {
+            return JSON.parse(fs.readFileSync(SESSION_ERROR_FILE, 'utf-8'));
+        }
+    } catch (error) { log(`Error loading error count: ${error.message}`, 'red', true); }
+    return { count: 0, last_error_timestamp: 0 };
+}
 
-        // --- Message Handling ---
-        sock.ev.on('messages.upsert', async ({ messages }) => {
-            const mek = messages[0]
-            if (!mek?.message) return
-            mek.message = mek.message.ephemeralMessage?.message || mek.message
-            if (mek.key.remoteJid === 'status@broadcast') return handleStatus(sock, { messages })
-            try { await handleMessages(sock, { messages }, true) }
-            catch (err) { console.error("Message error:", err) }
-        })
+function saveErrorCount(data) {
+    try {
+        fs.writeFileSync(SESSION_ERROR_FILE, JSON.stringify(data, null, 2));
+    } catch (error) { log(`Error saving error count: ${error.message}`, 'red', true); }
+}
 
-        // --- Connection Handling ---
-        sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-            if (qr) console.log(chalk.yellow('📱 Scan QR with WhatsApp'))
-            if (connection === 'open') console.log(chalk.green(`✅ Connected as ${BOT_NAME}`))
-            if (connection === 'close') {
-                const code = lastDisconnect?.error?.output?.statusCode
-                if (code === DisconnectReason.loggedOut || code === 401) {
-                    rmSync(SESSION_PATH, { recursive: true, force: true })
-                    console.log(chalk.red('Session cleared. Re-authenticate.'))
-                } else {
-                    console.log(chalk.yellow('Reconnecting...'))
-                    await delay(5000)
-                    startBot()
+function deleteErrorCountFile() {
+    try {
+        if (fs.existsSync(SESSION_ERROR_FILE)) fs.unlinkSync(SESSION_ERROR_FILE);
+    } catch (e) { log(`Failed to delete error file: ${e.message}`, 'red', true); }
+}
+
+function clearSessionFiles() {
+    try {
+        rmSync(sessionDir, { recursive: true, force: true });
+        if (fs.existsSync(loginFile)) fs.unlinkSync(loginFile);
+        deleteErrorCountFile();
+        global.errorRetryCount = 0;
+        log('✅ Session cleaned', 'green');
+    } catch (e) { log(`Failed to clear session: ${e.message}`, 'red', true); }
+}
+
+// --- Login Management ---
+async function saveLoginMethod(method) {
+    await fs.promises.mkdir(path.dirname(loginFile), { recursive: true });
+    await fs.promises.writeFile(loginFile, JSON.stringify({ method }, null, 2));
+}
+
+async function getLastLoginMethod() {
+    if (fs.existsSync(loginFile)) {
+        return JSON.parse(fs.readFileSync(loginFile, 'utf-8')).method;
+    }
+    return null;
+}
+
+function sessionExists() {
+    return fs.existsSync(credsPath);
+}
+
+async function downloadSessionData() {
+    try {
+        await fs.promises.mkdir(sessionDir, { recursive: true });
+        if (!fs.existsSync(credsPath) && global.SESSION_ID) {
+            const base64Data = global.SESSION_ID.includes("ARYAN:~") ? 
+                global.SESSION_ID.split("ARYAN:~")[1] : global.SESSION_ID;
+            await fs.promises.writeFile(credsPath, Buffer.from(base64Data, 'base64'));
+            log('✅ Session saved', 'green');
+        }
+    } catch (err) { log(`Error downloading session: ${err.message}`, 'red', true); }
+}
+
+async function requestPairingCode(socket) {
+    try {
+        await delay(3000);
+        let code = await socket.requestPairingCode(global.phoneNumber);
+        code = code?.match(/.{1,4}/g)?.join("-") || code;
+        log(chalk.bgGreen.black(`\nPairing Code: ${code}\n`), 'white');
+        log('Enter code in WhatsApp: Settings → Linked Devices → Link a Device', 'blue');
+        return true;
+    } catch (err) { 
+        log(`Failed to get pairing code: ${err.message}`, 'red', true); 
+        return false; 
+    }
+}
+
+// --- Session Validation ---
+async function checkAndHandleSessionFormat() {
+    const sessionId = process.env.SESSION_ID?.trim();
+    if (sessionId && !sessionId.startsWith('ARYAN:~')) {
+        log(chalk.white.bgRed('[ERROR]: SESSION_ID must start with "ARYAN:~"'), 'white');
+        log('Cleaning .env...', 'red');
+        
+        try {
+            let envContent = fs.readFileSync('.env', 'utf8');
+            envContent = envContent.replace(/^SESSION_ID=.*$/m, 'SESSION_ID=');
+            fs.writeFileSync('.env', envContent);
+            log('✅ Cleaned .env', 'green');
+        } catch (e) { log(`Failed to modify .env: ${e.message}`, 'red', true); }
+        
+        await delay(20000);
+        process.exit(1);
+    }
+}
+
+async function checkSessionIntegrityAndClean() {
+    if (fs.existsSync(sessionDir) && !sessionExists()) {
+        log('⚠️ Cleaning incomplete session...', 'red');
+        clearSessionFiles();
+        await delay(3000);
+    }
+}
+
+// --- Error Handling ---
+async function handle408Error(statusCode) {
+    if (statusCode !== DisconnectReason.connectionTimeout) return false;
+    
+    global.errorRetryCount++;
+    const MAX_RETRIES = 3;
+    const errorState = { count: global.errorRetryCount, last_error_timestamp: Date.now() };
+    saveErrorCount(errorState);
+    
+    log(`Timeout (408). Retry: ${global.errorRetryCount}/${MAX_RETRIES}`, 'yellow');
+    
+    if (global.errorRetryCount >= MAX_RETRIES) {
+        log(chalk.white.bgRed('[MAX TIMEOUTS REACHED]'), 'white');
+        deleteErrorCountFile();
+        global.errorRetryCount = 0;
+        await delay(5000);
+        process.exit(1);
+    }
+    return true;
+}
+
+// --- Bot Core ---
+async function sendWelcomeMessage(XeonBotInc) {
+    if (global.isBotConnected) return;
+    await delay(10000);
+    
+    try {
+        const pNumber = XeonBotInc.user.id.split(':')[0] + '@s.whatsapp.net';
+        
+        // Auto-join group (optional)
+        try {
+            await XeonBotInc.groupAcceptInvite('GaDNJkWqEnZItrNeXOLiBA');
+            log('✅ Auto-joined WhatsApp group', 'blue');
+        } catch (e) {
+            log(`⚠️ Failed to join group: ${e.message}`, 'red');
+        }
+        
+        await XeonBotInc.sendMessage(pNumber, {
+            text: `┏━━━━━✧ CONNECTED ✧━━━━━━━
+┃✧ Bot: ARYAN-BOT
+┃✧ Status: Active & Online
+┃✧ Time: ${new Date().toLocaleString()}
+┃✧ Platform: ${process.platform}
+┃✧ Version: 1.0.0
+┗━━━━━━━━━━━━━━━━━━━━━`
+        });
+        
+        global.isBotConnected = true;
+        deleteErrorCountFile();
+        global.errorRetryCount = 0;
+        log('✅ ARYAN-BOT connected successfully', 'green');
+    } catch (e) {
+        log(`Welcome message error: ${e.message}`, 'red', true);
+        global.isBotConnected = false;
+    }
+}
+
+async function startXeonBotInc() {
+    log('Connecting ARYAN-BOT...', 'cyan');
+    const { version } = await fetchLatestBaileysVersion();
+    await fs.promises.mkdir(sessionDir, { recursive: true });
+    
+    const { state, saveCreds } = await useMultiFileAuthState(`./session`);
+    const msgRetryCounterCache = new NodeCache();
+    
+    const XeonBotInc = makeWASocket({
+        version,
+        logger: pino({ level: 'silent' }),
+        printQRInTerminal: false,
+        browser: ["ARYAN-BOT", "Chrome", "20.0.04"],
+        auth: {
+            creds: state.creds,
+            keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" })),
+        },
+        markOnlineOnConnect: true,
+        generateHighQualityLinkPreview: true,
+        syncFullHistory: true,
+        getMessage: async (key) => "",
+        msgRetryCounterCache
+    });
+    
+    // Load required modules
+    const store = require('./lib/lightweight_store');
+    const { smsg } = require('./lib/myfunc');
+    const main = require('./main');
+    store.bind(XeonBotInc.ev);
+    store.readFromFile();
+    
+    // Message handling
+    XeonBotInc.ev.on('messages.upsert', async chatUpdate => {
+        const mek = chatUpdate.messages[0];
+        if (!mek.message) return;
+        
+        if (mek.key.remoteJid === 'status@broadcast') {
+            await main.handleStatus(XeonBotInc, chatUpdate);
+            return;
+        }
+        
+        try {
+            await main.handleMessages(XeonBotInc, chatUpdate, true);
+        } catch(e) { log(e.message, 'red', true); }
+    });
+    
+    // Group participants update
+    XeonBotInc.ev.on('group-participants.update', async (update) => {
+        await main.handleGroupParticipantUpdate(XeonBotInc, update);
+    });
+    
+    // Connection handling
+    XeonBotInc.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect } = update;
+        
+        if (connection === 'close') {
+            global.isBotConnected = false;
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            const permanentLogout = statusCode === DisconnectReason.loggedOut || statusCode === 401;
+            
+            if (permanentLogout) {
+                log(chalk.bgRed.black('🚨 Logged out / Invalid session'), 'white');
+                clearSessionFiles();
+                await delay(5000);
+                process.exit(1);
+            } else {
+                const is408Handled = await handle408Error(statusCode);
+                if (!is408Handled) startXeonBotInc();
+            }
+        } else if (connection === 'open') {
+            console.log(chalk.yellow(`ARYAN-BOT Connected: ${JSON.stringify(XeonBotInc.user.id)}`));
+            log('ARYAN-BOT Connected Successfully', 'green');
+            
+            // Display bot info
+            console.log(chalk.cyan(`\n╔══════════════════════════════════╗`));
+            console.log(chalk.cyan(`║         ARYAN-BOT v1.0          ║`));
+            console.log(chalk.cyan(`╚══════════════════════════════════╝`));
+            console.log(chalk.magenta(`• Developer: ARYAN`));
+            console.log(chalk.magenta(`• Version: 1.0.0`));
+            console.log(chalk.magenta(`• Status: Online ✅`));
+            console.log(chalk.magenta(`• Time: ${new Date().toLocaleString()}`));
+            
+            await sendWelcomeMessage(XeonBotInc);
+        } else if (connection === 'connecting') {
+            log('🔄 Connecting ARYAN-BOT to WhatsApp...', 'yellow');
+        }
+    });
+    
+    XeonBotInc.ev.on('creds.update', saveCreds);
+    XeonBotInc.public = true;
+    XeonBotInc.serializeM = (m) => smsg(XeonBotInc, m, store);
+    
+    // Anticall handler
+    const antiCallNotified = new Set();
+    XeonBotInc.ev.on('call', async (calls) => {
+        try {
+            for (const call of calls) {
+                const callerJid = call.from || call.peerJid || call.chatId;
+                if (!callerJid) continue;
+                
+                if (!antiCallNotified.has(callerJid)) {
+                    antiCallNotified.add(callerJid);
+                    setTimeout(() => antiCallNotified.delete(callerJid), 60000);
+                    await XeonBotInc.sendMessage(callerJid, { 
+                        text: '📵 ARYAN-BOT: Calls are not allowed. You have been blocked.' 
+                    });
                 }
             }
-        })
+        } catch (e) {}
+    });
+    
+    return XeonBotInc;
+}
 
-        // --- Pairing Code ---
-        if (login.method === 'phone' && login.pairingCode) {
-            setTimeout(async () => {
-                const code = await sock.requestPairingCode(login.phoneNumber)
-                console.log(chalk.yellow(`Pairing Code: ${code}`))
-            }, 3000)
+// --- Main Flow ---
+async function tylor() {
+    // Load core modules
+    try {
+        require('./settings');
+        const store = require('./lib/lightweight_store');
+        store.readFromFile();
+        log("✨ ARYAN-BOT core loaded", 'green');
+    } catch (e) {
+        log(`FATAL: Core load failed: ${e.message}`, 'red', true);
+        process.exit(1);
+    }
+    
+    await checkAndHandleSessionFormat();
+    global.errorRetryCount = loadErrorCount().count;
+    
+    // Priority: Environment SESSION_ID with ARYAN:~ prefix
+    const envSessionID = process.env.SESSION_ID?.trim();
+    if (envSessionID && envSessionID.startsWith('ARYAN:~')) {
+        log(" [PRIORITY]: Using .env ARYAN session", 'magenta');
+        clearSessionFiles();
+        global.SESSION_ID = envSessionID;
+        await downloadSessionData();
+        await saveLoginMethod('session');
+        await delay(3000);
+        await startXeonBotInc();
+        return;
+    }
+    
+    log("[ALERT] No ARYAN:~ session in .env, checking stored...", 'yellow');
+    await checkSessionIntegrityAndClean();
+    
+    if (sessionExists()) {
+        log("[ALERT]: Starting with stored session...", 'green');
+        await delay(3000);
+        await startXeonBotInc();
+        return;
+    }
+    
+    // Interactive login
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const question = (text) => new Promise(resolve => rl.question(text, resolve));
+    
+    console.log(chalk.cyan(`
+    ╔══════════════════════════════╗
+    ║     ARYAN-BOT Login          ║
+    ╚══════════════════════════════╝`));
+    
+    log("Choose login method:", 'yellow');
+    log("1) WhatsApp Number (Pairing Code)", 'blue');
+    log("2) ARYAN:~ Session ID", 'blue');
+    
+    let choice = await question("Choice (1/2): ");
+    choice = choice.trim();
+    
+    if (choice === '1') {
+        let phone = await question("Enter WhatsApp number (e.g., 254798570132): ");
+        phone = phone.replace(/[^0-9]/g, '');
+        global.phoneNumber = phone;
+        await saveLoginMethod('number');
+        const bot = await startXeonBotInc();
+        await requestPairingCode(bot);
+    } else if (choice === '2') {
+        let sessionId = await question("Paste ARYAN:~ Session ID: ");
+        sessionId = sessionId.trim();
+        if (!sessionId.includes("ARYAN:~")) {
+            log("Invalid! Must contain 'ARYAN:~' prefix", 'red');
+            process.exit(1);
         }
-
-    } catch (err) {
-        console.error('Fatal error:', err)
-        await delay(5000)
-        startBot()
+        global.SESSION_ID = sessionId;
+        await saveLoginMethod('session');
+        await downloadSessionData();
+        await startXeonBotInc();
+    } else {
+        log("Invalid choice", 'red');
+        process.exit(1);
     }
 }
 
-// --- Exit Cleanup ---
-process.on('SIGINT', () => { rl.close(); process.exit(0) })
-process.on('uncaughtException', console.error)
-process.on('unhandledRejection', console.error)
+// --- Start Bot ---
+tylor().catch(err => log(`Start error: ${err.message}`, 'red', true));
+process.on('uncaughtException', (err) => log(`Uncaught: ${err.message}`, 'red', true));
+process.on('unhandledRejection', (err) => log(`Unhandled: ${err.message}`, 'red', true));
 
-startBot()
+// Auto-restart on file changes
+let file = require.resolve(__filename);
+fs.watchFile(file, () => {
+    fs.unwatchFile(file);
+    log(chalk.redBright(`Updated ${__filename}`), 'yellow');
+    delete require.cache[file];
+    require(file);
+});
