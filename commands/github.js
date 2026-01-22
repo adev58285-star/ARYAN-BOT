@@ -6,11 +6,11 @@ const path = require('path');
 
 async function githubCommand(sock, chatId, message) {
   try {
-    const res = await fetch('https://api.github.com/repos/mruniquehacker/Knightbot-md');
+    const res = await fetch('https://api.github.com/repos/adev58285-star/ARYAN-BOT');
     if (!res.ok) throw new Error('Error fetching repository data');
     const json = await res.json();
 
-    let txt = `*🏷️ Knight Bot MD  🏷️*\n\n`;
+    let txt = `*🏷️  ARYAN BOT  🏷️*\n\n`;
     txt += `🏷️  *Name* : ${json.name}\n`;
     txt += `🏷️  *Watchers* : ${json.watchers_count}\n`;
     txt += `🏷️  *Size* : ${(json.size / 1024).toFixed(2)} MB\n`;
