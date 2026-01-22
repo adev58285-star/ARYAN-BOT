@@ -22,14 +22,14 @@
 </p>
 
 2. **Pair Code Setup**  
-   <p align="center">
+   <p align="left">
      <a href="https://dave-sessions.onrender.com">
-       <img src="https://img.shields.io/badge/Get%20Pair--Code-animeblue?style=for-the-badge&logo=whatsapp" alt="Pair Code"> ARYAN
+       <img src="https://img.shields.io/badge/Get%20Pair--Code-animeblue?style=for-the-badge&logo=whatsapp" alt="Pair Code"
      </a>
    </p>
 
 3. **Deploy on Heroku**  
-<p>
+   <p align="left">
   <a href="https://heroku.com/deploy?template=https://github.com/adev58285-star/ARYAN-BOT" target="_blank">
     <img src="https://img.shields.io/badge/Deploy%20to%20Heroku-430098?style=for-the-badge&logo=heroku" alt="Deploy ARYAN-TECH to Heroku">
   </a>
