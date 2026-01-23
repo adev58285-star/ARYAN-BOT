@@ -341,8 +341,7 @@ async function handleMessages(sock, messageUpdate, printLog) {
 
             if (
                 userMessage.startsWith('.mute') ||
-                userMessage === '.unmute' ||
-                userMessage.startsWIth('.aryanban
+                userMessage === '.unmute'
                 userMessage.startsWith('.ban') ||
                 userMessage.startsWith('.unban') ||
                 userMessage.startsWith('.promote') ||
