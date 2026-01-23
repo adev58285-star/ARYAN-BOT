@@ -1,9 +1,9 @@
 {
   "users": [],
   "groups": [],
-  "antilink": {},
+  "antilink": true
   "antibadword": {},
-  "warnings": {},
+  "warnings":true
   "sudo": [],
   "welcome": {},
   "goodbye": {},
